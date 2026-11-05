@@ -47,7 +47,7 @@ Steam launch options for a DX12 game with FSR4 INT8, using Proton-CachyOS (which
 OptiScaler) with this patch installed:
 
 ```
-DXVK_CONFIG='dxgi.customDeviceDesc = "AMD 100-000000735 (RADV GFX1013) GFX110"' PROTON_OPTISCALER_CONFIG="FSR.Fsr4Update=true;Log.LogToFile=true" PROTON_USE_OPTISCALER=1 %command%
+DXVK_CONFIG='dxgi.customDeviceDesc = "AMD 100-000000735 (RADV GFX1013) GFX110"' PROTON_OPTISCALER_CONFIG="FSR.Fsr4Update=true" PROTON_USE_OPTISCALER=1 %command%
 ```
 
 The `GFX110` in the device description makes OptiScaler take its RDNA3 path, where the FSR4 SDK
