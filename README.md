@@ -266,3 +266,10 @@ Iceland and Tonga and wrote the fix this patch uses, adding `CHIP_GFX1013` to
 Viola showed the same corruption in a test of RADV's fill, copy and clear operations on the compute
 queue: 101 failures without the fix and none with it. The compute queue is enabled on Viola the same
 way as on the BC-250.
+
+## Disclaimer
+
+Everything in this repository is unofficial and provided as is, without warranty of any kind. Use it
+at your own risk. The author is not liable for any damages whatsoever that may arise from using it,
+including damage to hardware, data loss, crashes or GPU hangs. This project is not affiliated with
+or endorsed by AMD, Sony Interactive Entertainment or the Mesa project. See [LICENSE](LICENSE).
