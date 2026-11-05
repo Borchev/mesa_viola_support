@@ -79,7 +79,7 @@ available. `Log.LogToFile=true` only turns on OptiScaler's log file and can be l
 |---|---|---|
 | `RADV_VIOLA_ML` | `1` | Use the int8 matrix ops. `0` gives the stock RADV code. |
 | `RADV_VIOLA_ML_DEBUG` | `0` | For each compiled shader with int8 dot products, print a line with the number of ops used. |
-| `RADV_VIOLA_ML_MAX_WAVES` | `10` | Maximum waves per SIMD for shaders using the ops, 4 to 20. `0` removes the limit. |
+| `RADV_VIOLA_ML_MAX_WAVES` | `10` | Maximum waves per SIMD for shaders using the ops, 4 to 20. `0` removes the limit. In testing, 10 performed optimally |
 | `AMD_VIOLA_COMPUTE_QUEUE` | `1` | Expose the compute queue. `0` hides it, as stock Mesa does. |
 
 `RADV_VIOLA_ML` and `RADV_VIOLA_ML_MAX_WAVES` are part of the shader cache key, so changing them
