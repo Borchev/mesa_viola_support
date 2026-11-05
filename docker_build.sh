@@ -23,13 +23,15 @@ libdrm_sha256=fc68f9d0ba2ea63c9432a299e14fea09fad7a8a66e8039fcd7802ca59f77b4f5
 
 case "$target" in
 arch | archlinux | archlinux:*)
-   docker run --rm -v "$dir":/pkg -e OWNER="$owner" archlinux bash -c '
+   image=$target
+   if [ "$image" = arch ]; then image=archlinux; fi
+   docker run --rm -v "$dir":/pkg -e OWNER="$owner" "$image" bash -c '
 set -e
 pacman -Syu --noconfirm --needed \
   base-devel meson ninja python-mako python-packaging python-yaml glslang \
-  wayland-protocols libxrandr libxxf86vm expat libdisplay-info libdrm libelf \
-  libx11 libxcb libxshmfence systemd-libs vulkan-icd-loader \
-  vulkan-mesa-implicit-layers wayland xcb-util-keysyms zlib zstd
+  wayland-protocols libxrandr expat libdisplay-info libdrm libelf libx11 libxcb \
+  libxshmfence spirv-tools systemd-libs vulkan-icd-loader vulkan-mesa-implicit-layers \
+  wayland xcb-util-keysyms zlib zstd
 
 # makepkg refuses to run as root.
 useradd -m builder
@@ -48,21 +50,21 @@ debian:* | ubuntu:*)
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  build-essential ca-certificates curl xz-utils patch pkg-config bison flex \
+  build-essential ca-certificates curl xz-utils patch pkg-config \
   meson ninja-build python3-mako python3-packaging python3-yaml glslang-tools \
   libdrm-dev libelf-dev libexpat1-dev zlib1g-dev libzstd-dev libudev-dev \
-  libwayland-dev wayland-protocols libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \
+  libwayland-dev wayland-protocols libx11-dev libx11-xcb-dev \
   libxcb1-dev libxcb-dri3-dev libxcb-present-dev libxcb-sync-dev libxcb-shm0-dev \
-  libxcb-xfixes0-dev libxcb-randr0-dev libxshmfence-dev libxrandr-dev libxxf86vm-dev'
+  libxcb-xfixes0-dev libxcb-randr0-dev libxshmfence-dev libxrandr-dev'
    ;;
 fedora:*)
    deps='
 dnf install -y \
-  gcc gcc-c++ curl xz tar gzip patch pkgconf-pkg-config bison flex \
+  gcc gcc-c++ curl xz tar gzip patch pkgconf-pkg-config \
   meson ninja-build python3-mako python3-packaging python3-pyyaml glslang \
   libdrm-devel elfutils-libelf-devel expat-devel zlib-devel libzstd-devel systemd-devel \
-  wayland-devel wayland-protocols-devel libX11-devel libXext-devel libXfixes-devel \
-  libxcb-devel libxshmfence-devel libXrandr-devel libXxf86vm-devel'
+  wayland-devel wayland-protocols-devel libX11-devel libxcb-devel libxshmfence-devel \
+  libXrandr-devel'
    ;;
 *)
    echo "Unsupported target: $target (use archlinux, debian:<release>, ubuntu:<release> or fedora:<release>)" >&2

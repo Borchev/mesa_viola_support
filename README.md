@@ -20,15 +20,16 @@ Tested on 13DA hardware with CachyOS and Mesa 26.2.6:
 The convolutions are int8 layers on a 1920x1080 image (int8 activations and weights, ReLU, int8
 outputs). The peak test runs int8 matrix-vector products with the data in registers and weights that
 are constants in the shader. Both come from a small Vulkan benchmark, run with the GPU clock pinned
-at 2350 MHz.
+at 2350 MHz and the clock driver's temperature limit raised to avoid throttling.
 
 \* Stock RADV doesn't run the peak test: its emulation of int8 dot products runs out of registers in
 that shader. ~11 TOPS is its rate on the 3x3 layer.
 
 FSR4's int8 network was timed with a Vulkan layer in a DX12 game under Proton (FSR4 INT8 through
-OptiScaler, frame generation on). The patch saves about 2.4 ms of GPU time per rendered frame: with
-stock RADV the game dropped to 55 to 58 rendered fps in its heaviest section, and with the patch it
-stayed at its 60 fps cap.
+OptiScaler, frame generation on), with the GPU at 2350 MHz. The stock time is a measurement at
+2000 MHz (3.97 ms) scaled to 2350 MHz. The patch saves about 2.4 ms of GPU time per rendered frame:
+with stock RADV the game dropped to 55 to 58 rendered fps in its heaviest section, and with the
+patch it stayed at its 60 fps cap.
 
 Other checks:
 
@@ -62,11 +63,12 @@ available. `Log.LogToFile=true` only turns on OptiScaler's log file and can be l
   Requantization of the results to int8 uses the quantize op (0x28).
 - ACO: the new opcodes and their encoding, register allocation constraints, hazard waits, and
   scheduling that keeps independent accumulator chains interleaved (a dependent op stalls the SIMD).
-- Constant weights go in the shader's constant data, and one scalar load reads the weights of
-  four ops. The scalar cache can only supply new weights for about half of the op's rate, so when
+- Constant weights go in the shader's constant data, and one scalar load reads up to four sets of
+  weights. The scalar cache can only supply new weights for about half of the op's rate, so when
   a shader computes the same layer for several pixels, the pass emits their ops together and ACO
   loads each set of weights once for all of them.
-- Compute shaders that use the ops are compiled as wave32 and limited to 10 waves per SIMD.
+- Compute shaders with int8 dot products are compiled as wave32 unless they need a particular wave
+  size, and those that use the ops are limited to 10 waves per SIMD.
 - Exposes the compute queue on Viola and works around partial-threadgroup corruption of async
   compute dispatches on GFX1013. The workaround comes from the BC-250 community; see
   [Credits](#credits).
@@ -76,8 +78,8 @@ available. `Log.LogToFile=true` only turns on OptiScaler's log file and can be l
 | Variable | Default | |
 |---|---|---|
 | `RADV_VIOLA_ML` | `1` | Use the int8 matrix ops. `0` gives the stock RADV code. |
-| `RADV_VIOLA_ML_DEBUG` | `0` | Print one line per compiled shader with the number of ops used. |
-| `RADV_VIOLA_ML_MAX_WAVES` | `10` | Waves per SIMD for shaders using the ops. `0` removes the limit. |
+| `RADV_VIOLA_ML_DEBUG` | `0` | For each compiled shader with int8 dot products, print a line with the number of ops used. |
+| `RADV_VIOLA_ML_MAX_WAVES` | `10` | Maximum waves per SIMD for shaders using the ops, 4 to 20. `0` removes the limit. |
 | `AMD_VIOLA_COMPUTE_QUEUE` | `1` | Expose the compute queue. `0` hides it, as stock Mesa does. |
 
 `RADV_VIOLA_ML` and `RADV_VIOLA_ML_MAX_WAVES` are part of the shader cache key, so changing them
@@ -101,9 +103,9 @@ Install the build tools and the packages the driver is built against:
 
 ```sh
 sudo pacman -S --needed base-devel meson ninja python-mako python-packaging python-yaml glslang \
-  wayland-protocols libxrandr libxxf86vm expat libdisplay-info libdrm libelf libx11 libxcb \
-  libxshmfence systemd-libs vulkan-icd-loader vulkan-mesa-implicit-layers wayland \
-  xcb-util-keysyms zlib zstd
+  wayland-protocols libxrandr expat libdisplay-info libdrm libelf libx11 libxcb libxshmfence \
+  spirv-tools systemd-libs vulkan-icd-loader vulkan-mesa-implicit-layers wayland xcb-util-keysyms \
+  zlib zstd
 ```
 
 Then, in this folder:
@@ -191,8 +193,9 @@ VK_DRIVER_FILES=/usr/local/lib/mesa-viola/share/vulkan/icd.d/radeon_icd.x86_64.j
 ```
 
 For a Steam game, put the same setting in front of `%command%` in its launch options (this hasn't
-been tested with Steam's runtime container yet). To use it for everything, add this line to `/etc/environment` and log in again. The second file keeps the
-distribution's 32-bit driver for 32-bit programs, since only a 64-bit driver is built:
+been tested with Steam's runtime container yet). To use it for everything, add this line to
+`/etc/environment` and log in again. The second file keeps the distribution's 32-bit driver for
+32-bit programs, since only a 64-bit driver is built:
 
 ```
 VK_DRIVER_FILES=/usr/local/lib/mesa-viola/share/vulkan/icd.d/radeon_icd.x86_64.json:/usr/share/vulkan/icd.d/radeon_icd.i686.json
@@ -214,7 +217,8 @@ vulkaninfo | grep -E "queueFlags *= QUEUE_COMPUTE_BIT"
 ### Other distributions, without Docker
 
 Build dependencies: meson, ninja, python3 with mako, packaging and PyYAML, glslang, and the
-development files for libdrm, libelf, expat, zlib, zstd, Wayland and X11 (xcb, xshmfence, xrandr).
+development files for libdrm (2.4.133 or newer), libelf, expat, zlib, zstd, Wayland and X11 (xcb,
+xshmfence, xrandr).
 
 ```sh
 curl -LO https://archive.mesa3d.org/mesa-26.2.6.tar.xz

@@ -2,7 +2,7 @@
 
 Viola (PCI device ID 13DA/13DC, see [README.md](README.md)) adds an instruction class that GFX1013
 doesn't have. There is no public documentation for it; this description is unofficial and may be
-incomplete. The instructions work in any compute shader (wave32); no special mode is needed.
+incomplete. The instructions work in any wave32 compute shader; no special mode is needed.
 
 ## Encoding
 
@@ -84,9 +84,10 @@ These are outside the class above. The ops above don't need any of them.
   instructions take their base from m0[15:0], so one m0 value can hold both bases. They need
   allocated LDS.
 - SMEM 0x2b: prefetches code at s[base] + offset. It writes no register.
-- SOPP 0x2a / 0x2b: no operand, used as a balanced pair around blocks of these instructions. They
-  don't change results or give a wave exclusive use of the SIMD. In short loops with several waves
-  per SIMD, a block between them ran about 15% faster.
+- SOPP 0x2a / 0x2b: no operand, used in pairs around blocks of these instructions: 0x2a before the
+  block, 0x2b after it. They don't change results or give a wave exclusive use of the SIMD. In short
+  loops with several waves per SIMD, a block between them ran about 15% faster. A 0x2b with no 0x2a
+  before it, followed by an op of this class, hung the GPU, and the GPU reset didn't recover.
 - Hardware register 26: bits 1:0 are writable, default 0. Values other than 0 turn off some of the
   hardware's dependency checks. Leave it at 0.
 
@@ -107,8 +108,11 @@ These are outside the class above. The ops above don't need any of them.
 - s[n+2] must be at or below s105.
 - Ops with a D1 result always write it: 0 in the D1 field means v0, not "none". C+1 is always read,
   so C must not be the last allocated VGPR, or the wave dies without an error.
+- Use wave32. In wave64, D0 is correct, but the second half of the wave (lanes 32-63) uses lanes
+  0-31 of D1, so D1 is wrong in all lanes.
 - VGPR writes don't wait for older memory instructions that still have to read those VGPRs, such as
-  a store's data. Wait with `s_waitcnt_depctr vm_vsrc(0)` before overwriting them.
+  a store's data. Wait with `s_waitcnt_depctr vm_vsrc(0)` before overwriting them. The quantize op
+  (0x28) is an exception: it does wait for a buffer store's data.
 - An op that uses the previous op's accumulator stalls the SIMD for about 5 cycles, and other waves
   don't fill the gap. Interleave at least 4 independent accumulators.
 
@@ -122,7 +126,12 @@ Measured at 2.2-2.35 GHz with 16 waves per SIMD:
 | 0x22 | ~0.97 per clock | ~280 TOPS int8 |
 | 0x42 | ~0.95 per clock | ~68 TFLOPS fp16 |
 | 0x23, 4 dependent ops per accumulator in a row | ~0.25 per clock | |
+| 0x23 with new weights from a scalar load for every op | ~0.5 per clock | ~144 TOPS int8 |
 | v_fmac_f32 (for comparison) | 0.99 per clock | 17.8 TFLOPS fp32 |
+
+Weights read with scalar loads come through the scalar cache, which delivers about 32 bytes per
+clock per WGP (4 SIMDs). That is enough for 0.5 ops per clock per SIMD when each op needs 16 new
+bytes. Ops that share loaded weights, such as the same layer for two pixels, get past that limit.
 
 ## What's missing
 
